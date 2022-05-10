@@ -1,0 +1,950 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "1b8e8e50",
+   "metadata": {
+    "papermill": {
+     "duration": 0.022659,
+     "end_time": "2022-04-24T20:51:17.083670",
+     "exception": false,
+     "start_time": "2022-04-24T20:51:17.061011",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "Повторим для тестовой и тренировочной выборки всё то же, что делали при подборе метода моделирования, с учётом того, что используется только выбранный метод (KNN) и найденные параметры для него и Doc2Vec: vector_size = 5, min_count = 2, n_neighbors = 41"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "id": "fbcbd492",
+   "metadata": {
+    "_cell_guid": "b1076dfc-b9ad-4769-8c92-a6c4dae69d19",
+    "_uuid": "8f2839f25d086af736a60e9eeb907d3b93b6e0e5",
+    "execution": {
+     "iopub.execute_input": "2022-04-24T20:51:17.134722Z",
+     "iopub.status.busy": "2022-04-24T20:51:17.133815Z",
+     "iopub.status.idle": "2022-04-24T20:51:17.144559Z",
+     "shell.execute_reply": "2022-04-24T20:51:17.145069Z",
+     "shell.execute_reply.started": "2022-04-24T19:56:53.457584Z"
+    },
+    "papermill": {
+     "duration": 0.040494,
+     "end_time": "2022-04-24T20:51:17.145364",
+     "exception": false,
+     "start_time": "2022-04-24T20:51:17.104870",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "/kaggle/input/kontur-home-assignment/test.tsv\n",
+      "/kaggle/input/kontur-home-assignment/train.tsv\n"
+     ]
+    }
+   ],
+   "source": [
+    "import numpy as np # linear algebra\n",
+    "import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)\n",
+    "import os\n",
+    "for dirname, _, filenames in os.walk('/kaggle/input'):\n",
+    "    for filename in filenames:\n",
+    "        print(os.path.join(dirname, filename))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "95f3a7d4",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2022-04-24T20:51:17.188953Z",
+     "iopub.status.busy": "2022-04-24T20:51:17.187951Z",
+     "iopub.status.idle": "2022-04-24T20:51:29.748054Z",
+     "shell.execute_reply": "2022-04-24T20:51:29.747083Z",
+     "shell.execute_reply.started": "2022-04-24T19:56:53.590260Z"
+    },
+    "papermill": {
+     "duration": 12.582754,
+     "end_time": "2022-04-24T20:51:29.748212",
+     "exception": false,
+     "start_time": "2022-04-24T20:51:17.165458",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Collecting pymorphy2\r\n",
+      "  Downloading pymorphy2-0.9.1-py3-none-any.whl (55 kB)\r\n",
+      "     |████████████████████████████████| 55 kB 273 kB/s            \r\n",
+      "\u001b[?25hCollecting pymorphy2-dicts-ru<3.0,>=2.4\r\n",
+      "  Downloading pymorphy2_dicts_ru-2.4.417127.4579844-py2.py3-none-any.whl (8.2 MB)\r\n",
+      "     |████████████████████████████████| 8.2 MB 1.6 MB/s            \r\n",
+      "\u001b[?25hCollecting dawg-python>=0.7.1\r\n",
+      "  Downloading DAWG_Python-0.7.2-py2.py3-none-any.whl (11 kB)\r\n",
+      "Requirement already satisfied: docopt>=0.6 in /opt/conda/lib/python3.7/site-packages (from pymorphy2) (0.6.2)\r\n",
+      "Installing collected packages: pymorphy2-dicts-ru, dawg-python, pymorphy2\r\n",
+      "Successfully installed dawg-python-0.7.2 pymorphy2-0.9.1 pymorphy2-dicts-ru-2.4.417127.4579844\r\n",
+      "\u001b[33mWARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv\u001b[0m\r\n",
+      "Note: you may need to restart the kernel to use updated packages.\n"
+     ]
+    }
+   ],
+   "source": [
+    "pip install pymorphy2"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "2f80eb48",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2022-04-24T20:51:29.819142Z",
+     "iopub.status.busy": "2022-04-24T20:51:29.813949Z",
+     "iopub.status.idle": "2022-04-24T20:51:36.963406Z",
+     "shell.execute_reply": "2022-04-24T20:51:36.963902Z",
+     "shell.execute_reply.started": "2022-04-24T19:57:06.196762Z"
+    },
+    "papermill": {
+     "duration": 7.184005,
+     "end_time": "2022-04-24T20:51:36.964076",
+     "exception": false,
+     "start_time": "2022-04-24T20:51:29.780071",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Requirement already satisfied: pymorphy2-dicts-ru in /opt/conda/lib/python3.7/site-packages (2.4.417127.4579844)\r\n",
+      "\u001b[33mWARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv\u001b[0m\r\n",
+      "Note: you may need to restart the kernel to use updated packages.\n"
+     ]
+    }
+   ],
+   "source": [
+    "pip install pymorphy2-dicts-ru"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "id": "560db57b",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2022-04-24T20:51:37.036274Z",
+     "iopub.status.busy": "2022-04-24T20:51:37.035016Z",
+     "iopub.status.idle": "2022-04-24T20:52:00.141957Z",
+     "shell.execute_reply": "2022-04-24T20:52:00.141195Z",
+     "shell.execute_reply.started": "2022-04-24T19:57:14.925519Z"
+    },
+    "papermill": {
+     "duration": 23.147448,
+     "end_time": "2022-04-24T20:52:00.142162",
+     "exception": false,
+     "start_time": "2022-04-24T20:51:36.994714",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Collecting texthero\r\n",
+      "  Downloading texthero-1.1.0-py3-none-any.whl (24 kB)\r\n",
+      "Requirement already satisfied: scikit-learn>=0.22 in /opt/conda/lib/python3.7/site-packages (from texthero) (1.0.1)\r\n",
+      "Requirement already satisfied: plotly>=4.2.0 in /opt/conda/lib/python3.7/site-packages (from texthero) (5.6.0)\r\n",
+      "Collecting gensim<4.0,>=3.6.0\r\n",
+      "  Downloading gensim-3.8.3-cp37-cp37m-manylinux1_x86_64.whl (24.2 MB)\r\n",
+      "     |████████████████████████████████| 24.2 MB 461 kB/s             \r\n",
+      "\u001b[?25hRequirement already satisfied: matplotlib>=3.1.0 in /opt/conda/lib/python3.7/site-packages (from texthero) (3.5.1)\r\n",
+      "Requirement already satisfied: unidecode>=1.1.1 in /opt/conda/lib/python3.7/site-packages (from texthero) (1.3.2)\r\n",
+      "Collecting nltk>=3.3\r\n",
+      "  Downloading nltk-3.7-py3-none-any.whl (1.5 MB)\r\n",
+      "     |████████████████████████████████| 1.5 MB 70.3 MB/s            \r\n",
+      "\u001b[?25hCollecting spacy<3.0.0\r\n",
+      "  Downloading spacy-2.3.7-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (10.4 MB)\r\n",
+      "     |████████████████████████████████| 10.4 MB 38.1 MB/s            \r\n",
+      "\u001b[?25hRequirement already satisfied: tqdm>=4.3 in /opt/conda/lib/python3.7/site-packages (from texthero) (4.62.3)\r\n",
+      "Requirement already satisfied: numpy>=1.17 in /opt/conda/lib/python3.7/site-packages (from texthero) (1.20.3)\r\n",
+      "Requirement already satisfied: wordcloud>=1.5.0 in /opt/conda/lib/python3.7/site-packages (from texthero) (1.8.1)\r\n",
+      "Requirement already satisfied: pandas>=1.0.2 in /opt/conda/lib/python3.7/site-packages (from texthero) (1.3.5)\r\n",
+      "Requirement already satisfied: scipy>=0.18.1 in /opt/conda/lib/python3.7/site-packages (from gensim<4.0,>=3.6.0->texthero) (1.7.3)\r\n",
+      "Requirement already satisfied: six>=1.5.0 in /opt/conda/lib/python3.7/site-packages (from gensim<4.0,>=3.6.0->texthero) (1.16.0)\r\n",
+      "Requirement already satisfied: smart-open>=1.8.1 in /opt/conda/lib/python3.7/site-packages (from gensim<4.0,>=3.6.0->texthero) (5.2.1)\r\n",
+      "Requirement already satisfied: pyparsing>=2.2.1 in /opt/conda/lib/python3.7/site-packages (from matplotlib>=3.1.0->texthero) (3.0.6)\r\n",
+      "Requirement already satisfied: packaging>=20.0 in /opt/conda/lib/python3.7/site-packages (from matplotlib>=3.1.0->texthero) (21.3)\r\n",
+      "Requirement already satisfied: cycler>=0.10 in /opt/conda/lib/python3.7/site-packages (from matplotlib>=3.1.0->texthero) (0.11.0)\r\n",
+      "Requirement already satisfied: kiwisolver>=1.0.1 in /opt/conda/lib/python3.7/site-packages (from matplotlib>=3.1.0->texthero) (1.3.2)\r\n",
+      "Requirement already satisfied: pillow>=6.2.0 in /opt/conda/lib/python3.7/site-packages (from matplotlib>=3.1.0->texthero) (8.2.0)\r\n",
+      "Requirement already satisfied: python-dateutil>=2.7 in /opt/conda/lib/python3.7/site-packages (from matplotlib>=3.1.0->texthero) (2.8.2)\r\n",
+      "Requirement already satisfied: fonttools>=4.22.0 in /opt/conda/lib/python3.7/site-packages (from matplotlib>=3.1.0->texthero) (4.28.4)\r\n",
+      "Requirement already satisfied: regex>=2021.8.3 in /opt/conda/lib/python3.7/site-packages (from nltk>=3.3->texthero) (2021.11.10)\r\n",
+      "Requirement already satisfied: joblib in /opt/conda/lib/python3.7/site-packages (from nltk>=3.3->texthero) (1.1.0)\r\n",
+      "Requirement already satisfied: click in /opt/conda/lib/python3.7/site-packages (from nltk>=3.3->texthero) (8.0.3)\r\n",
+      "Requirement already satisfied: pytz>=2017.3 in /opt/conda/lib/python3.7/site-packages (from pandas>=1.0.2->texthero) (2021.3)\r\n",
+      "Requirement already satisfied: tenacity>=6.2.0 in /opt/conda/lib/python3.7/site-packages (from plotly>=4.2.0->texthero) (8.0.1)\r\n",
+      "Requirement already satisfied: threadpoolctl>=2.0.0 in /opt/conda/lib/python3.7/site-packages (from scikit-learn>=0.22->texthero) (3.0.0)\r\n",
+      "Requirement already satisfied: preshed<3.1.0,>=3.0.2 in /opt/conda/lib/python3.7/site-packages (from spacy<3.0.0->texthero) (3.0.6)\r\n",
+      "Requirement already satisfied: wasabi<1.1.0,>=0.4.0 in /opt/conda/lib/python3.7/site-packages (from spacy<3.0.0->texthero) (0.9.0)\r\n",
+      "Requirement already satisfied: murmurhash<1.1.0,>=0.28.0 in /opt/conda/lib/python3.7/site-packages (from spacy<3.0.0->texthero) (1.0.6)\r\n",
+      "Collecting plac<1.2.0,>=0.9.6\r\n",
+      "  Downloading plac-1.1.3-py2.py3-none-any.whl (20 kB)\r\n",
+      "Requirement already satisfied: requests<3.0.0,>=2.13.0 in /opt/conda/lib/python3.7/site-packages (from spacy<3.0.0->texthero) (2.26.0)\r\n",
+      "Collecting thinc<7.5.0,>=7.4.1\r\n",
+      "  Downloading thinc-7.4.5-cp37-cp37m-manylinux2014_x86_64.whl (1.0 MB)\r\n",
+      "     |████████████████████████████████| 1.0 MB 67.6 MB/s            \r\n",
+      "\u001b[?25hRequirement already satisfied: blis<0.8.0,>=0.4.0 in /opt/conda/lib/python3.7/site-packages (from spacy<3.0.0->texthero) (0.7.6)\r\n",
+      "Requirement already satisfied: setuptools in /opt/conda/lib/python3.7/site-packages (from spacy<3.0.0->texthero) (59.5.0)\r\n",
+      "Requirement already satisfied: cymem<2.1.0,>=2.0.2 in /opt/conda/lib/python3.7/site-packages (from spacy<3.0.0->texthero) (2.0.6)\r\n",
+      "Collecting srsly<1.1.0,>=1.0.2\r\n",
+      "  Downloading srsly-1.0.5-cp37-cp37m-manylinux2014_x86_64.whl (184 kB)\r\n",
+      "     |████████████████████████████████| 184 kB 68.5 MB/s            \r\n",
+      "\u001b[?25hCollecting catalogue<1.1.0,>=0.0.7\r\n",
+      "  Downloading catalogue-1.0.0-py2.py3-none-any.whl (7.7 kB)\r\n",
+      "Requirement already satisfied: importlib-metadata>=0.20 in /opt/conda/lib/python3.7/site-packages (from catalogue<1.1.0,>=0.0.7->spacy<3.0.0->texthero) (4.11.3)\r\n",
+      "Requirement already satisfied: urllib3<1.27,>=1.21.1 in /opt/conda/lib/python3.7/site-packages (from requests<3.0.0,>=2.13.0->spacy<3.0.0->texthero) (1.26.7)\r\n",
+      "Requirement already satisfied: idna<4,>=2.5 in /opt/conda/lib/python3.7/site-packages (from requests<3.0.0,>=2.13.0->spacy<3.0.0->texthero) (3.1)\r\n",
+      "Requirement already satisfied: certifi>=2017.4.17 in /opt/conda/lib/python3.7/site-packages (from requests<3.0.0,>=2.13.0->spacy<3.0.0->texthero) (2021.10.8)\r\n",
+      "Requirement already satisfied: charset-normalizer~=2.0.0 in /opt/conda/lib/python3.7/site-packages (from requests<3.0.0,>=2.13.0->spacy<3.0.0->texthero) (2.0.9)\r\n",
+      "Requirement already satisfied: zipp>=0.5 in /opt/conda/lib/python3.7/site-packages (from importlib-metadata>=0.20->catalogue<1.1.0,>=0.0.7->spacy<3.0.0->texthero) (3.6.0)\r\n",
+      "Requirement already satisfied: typing-extensions>=3.6.4 in /opt/conda/lib/python3.7/site-packages (from importlib-metadata>=0.20->catalogue<1.1.0,>=0.0.7->spacy<3.0.0->texthero) (4.1.1)\r\n",
+      "Installing collected packages: srsly, plac, catalogue, thinc, spacy, nltk, gensim, texthero\r\n",
+      "  Attempting uninstall: srsly\r\n",
+      "    Found existing installation: srsly 2.4.2\r\n",
+      "    Uninstalling srsly-2.4.2:\r\n",
+      "      Successfully uninstalled srsly-2.4.2\r\n",
+      "  Attempting uninstall: catalogue\r\n",
+      "    Found existing installation: catalogue 2.0.6\r\n",
+      "    Uninstalling catalogue-2.0.6:\r\n",
+      "      Successfully uninstalled catalogue-2.0.6\r\n",
+      "  Attempting uninstall: thinc\r\n",
+      "    Found existing installation: thinc 8.0.15\r\n",
+      "    Uninstalling thinc-8.0.15:\r\n",
+      "      Successfully uninstalled thinc-8.0.15\r\n",
+      "  Attempting uninstall: spacy\r\n",
+      "    Found existing installation: spacy 3.2.3\r\n",
+      "    Uninstalling spacy-3.2.3:\r\n",
+      "      Successfully uninstalled spacy-3.2.3\r\n",
+      "  Attempting uninstall: nltk\r\n",
+      "    Found existing installation: nltk 3.2.4\r\n",
+      "    Uninstalling nltk-3.2.4:\r\n",
+      "      Successfully uninstalled nltk-3.2.4\r\n",
+      "  Attempting uninstall: gensim\r\n",
+      "    Found existing installation: gensim 4.0.1\r\n",
+      "    Uninstalling gensim-4.0.1:\r\n",
+      "      Successfully uninstalled gensim-4.0.1\r\n",
+      "\u001b[31mERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.\r\n",
+      "scattertext 0.1.5 requires gensim>=4.0.0, but you have gensim 3.8.3 which is incompatible.\r\n",
+      "preprocessing 0.1.13 requires nltk==3.2.4, but you have nltk 3.7 which is incompatible.\r\n",
+      "en-core-web-sm 3.2.0 requires spacy<3.3.0,>=3.2.0, but you have spacy 2.3.7 which is incompatible.\r\n",
+      "en-core-web-lg 3.2.0 requires spacy<3.3.0,>=3.2.0, but you have spacy 2.3.7 which is incompatible.\u001b[0m\r\n",
+      "Successfully installed catalogue-1.0.0 gensim-3.8.3 nltk-3.7 plac-1.1.3 spacy-2.3.7 srsly-1.0.5 texthero-1.1.0 thinc-7.4.5\r\n",
+      "\u001b[33mWARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv\u001b[0m\r\n",
+      "Note: you may need to restart the kernel to use updated packages.\n"
+     ]
+    }
+   ],
+   "source": [
+    "pip install texthero"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "1932f0ca",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2022-04-24T20:52:00.281975Z",
+     "iopub.status.busy": "2022-04-24T20:52:00.281338Z",
+     "iopub.status.idle": "2022-04-24T20:52:28.147937Z",
+     "shell.execute_reply": "2022-04-24T20:52:28.146955Z",
+     "shell.execute_reply.started": "2022-04-24T19:57:37.768657Z"
+    },
+    "papermill": {
+     "duration": 27.938222,
+     "end_time": "2022-04-24T20:52:28.148137",
+     "exception": false,
+     "start_time": "2022-04-24T20:52:00.209915",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Requirement already satisfied: spaCy in /opt/conda/lib/python3.7/site-packages (2.3.7)\r\n",
+      "Collecting spaCy\r\n",
+      "  Downloading spacy-3.2.4-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (6.0 MB)\r\n",
+      "     |████████████████████████████████| 6.0 MB 287 kB/s            \r\n",
+      "\u001b[?25hRequirement already satisfied: packaging>=20.0 in /opt/conda/lib/python3.7/site-packages (from spaCy) (21.3)\r\n",
+      "Requirement already satisfied: pydantic!=1.8,!=1.8.1,<1.9.0,>=1.7.4 in /opt/conda/lib/python3.7/site-packages (from spaCy) (1.8.2)\r\n",
+      "Requirement already satisfied: requests<3.0.0,>=2.13.0 in /opt/conda/lib/python3.7/site-packages (from spaCy) (2.26.0)\r\n",
+      "Collecting thinc<8.1.0,>=8.0.12\r\n",
+      "  Downloading thinc-8.0.15-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (653 kB)\r\n",
+      "     |████████████████████████████████| 653 kB 48.8 MB/s            \r\n",
+      "\u001b[?25hRequirement already satisfied: pathy>=0.3.5 in /opt/conda/lib/python3.7/site-packages (from spaCy) (0.6.1)\r\n",
+      "Collecting catalogue<2.1.0,>=2.0.6\r\n",
+      "  Downloading catalogue-2.0.7-py3-none-any.whl (17 kB)\r\n",
+      "Requirement already satisfied: murmurhash<1.1.0,>=0.28.0 in /opt/conda/lib/python3.7/site-packages (from spaCy) (1.0.6)\r\n",
+      "Requirement already satisfied: tqdm<5.0.0,>=4.38.0 in /opt/conda/lib/python3.7/site-packages (from spaCy) (4.62.3)\r\n",
+      "Collecting typing-extensions<4.0.0.0,>=3.7.4\r\n",
+      "  Downloading typing_extensions-3.10.0.2-py3-none-any.whl (26 kB)\r\n",
+      "Requirement already satisfied: jinja2 in /opt/conda/lib/python3.7/site-packages (from spaCy) (3.0.3)\r\n",
+      "Requirement already satisfied: wasabi<1.1.0,>=0.8.1 in /opt/conda/lib/python3.7/site-packages (from spaCy) (0.9.0)\r\n",
+      "Collecting srsly<3.0.0,>=2.4.1\r\n",
+      "  Downloading srsly-2.4.3-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (457 kB)\r\n",
+      "     |████████████████████████████████| 457 kB 68.7 MB/s            \r\n",
+      "\u001b[?25hRequirement already satisfied: blis<0.8.0,>=0.4.0 in /opt/conda/lib/python3.7/site-packages (from spaCy) (0.7.6)\r\n",
+      "Requirement already satisfied: typer<0.5.0,>=0.3.0 in /opt/conda/lib/python3.7/site-packages (from spaCy) (0.4.0)\r\n",
+      "Requirement already satisfied: preshed<3.1.0,>=3.0.2 in /opt/conda/lib/python3.7/site-packages (from spaCy) (3.0.6)\r\n",
+      "Requirement already satisfied: spacy-legacy<3.1.0,>=3.0.8 in /opt/conda/lib/python3.7/site-packages (from spaCy) (3.0.9)\r\n",
+      "Requirement already satisfied: langcodes<4.0.0,>=3.2.0 in /opt/conda/lib/python3.7/site-packages (from spaCy) (3.3.0)\r\n",
+      "Requirement already satisfied: cymem<2.1.0,>=2.0.2 in /opt/conda/lib/python3.7/site-packages (from spaCy) (2.0.6)\r\n",
+      "Requirement already satisfied: setuptools in /opt/conda/lib/python3.7/site-packages (from spaCy) (59.5.0)\r\n",
+      "Requirement already satisfied: spacy-loggers<2.0.0,>=1.0.0 in /opt/conda/lib/python3.7/site-packages (from spaCy) (1.0.1)\r\n",
+      "Requirement already satisfied: click<8.1.0 in /opt/conda/lib/python3.7/site-packages (from spaCy) (8.0.3)\r\n",
+      "Requirement already satisfied: numpy>=1.15.0 in /opt/conda/lib/python3.7/site-packages (from spaCy) (1.20.3)\r\n",
+      "Requirement already satisfied: zipp>=0.5 in /opt/conda/lib/python3.7/site-packages (from catalogue<2.1.0,>=2.0.6->spaCy) (3.6.0)\r\n",
+      "Requirement already satisfied: importlib-metadata in /opt/conda/lib/python3.7/site-packages (from click<8.1.0->spaCy) (4.11.3)\r\n",
+      "Requirement already satisfied: pyparsing!=3.0.5,>=2.0.2 in /opt/conda/lib/python3.7/site-packages (from packaging>=20.0->spaCy) (3.0.6)\r\n",
+      "Requirement already satisfied: smart-open<6.0.0,>=5.0.0 in /opt/conda/lib/python3.7/site-packages (from pathy>=0.3.5->spaCy) (5.2.1)\r\n",
+      "Requirement already satisfied: urllib3<1.27,>=1.21.1 in /opt/conda/lib/python3.7/site-packages (from requests<3.0.0,>=2.13.0->spaCy) (1.26.7)\r\n",
+      "Requirement already satisfied: idna<4,>=2.5 in /opt/conda/lib/python3.7/site-packages (from requests<3.0.0,>=2.13.0->spaCy) (3.1)\r\n",
+      "Requirement already satisfied: certifi>=2017.4.17 in /opt/conda/lib/python3.7/site-packages (from requests<3.0.0,>=2.13.0->spaCy) (2021.10.8)\r\n",
+      "Requirement already satisfied: charset-normalizer~=2.0.0 in /opt/conda/lib/python3.7/site-packages (from requests<3.0.0,>=2.13.0->spaCy) (2.0.9)\r\n",
+      "Requirement already satisfied: MarkupSafe>=2.0 in /opt/conda/lib/python3.7/site-packages (from jinja2->spaCy) (2.1.1)\r\n",
+      "Installing collected packages: typing-extensions, catalogue, srsly, thinc, spaCy\r\n",
+      "  Attempting uninstall: typing-extensions\r\n",
+      "    Found existing installation: typing-extensions 4.1.1\r\n",
+      "    Uninstalling typing-extensions-4.1.1:\r\n",
+      "      Successfully uninstalled typing-extensions-4.1.1\r\n",
+      "  Attempting uninstall: catalogue\r\n",
+      "    Found existing installation: catalogue 1.0.0\r\n",
+      "    Uninstalling catalogue-1.0.0:\r\n",
+      "      Successfully uninstalled catalogue-1.0.0\r\n",
+      "  Attempting uninstall: srsly\r\n",
+      "    Found existing installation: srsly 1.0.5\r\n",
+      "    Uninstalling srsly-1.0.5:\r\n",
+      "      Successfully uninstalled srsly-1.0.5\r\n",
+      "  Attempting uninstall: thinc\r\n",
+      "    Found existing installation: thinc 7.4.5\r\n",
+      "    Uninstalling thinc-7.4.5:\r\n",
+      "      Successfully uninstalled thinc-7.4.5\r\n",
+      "  Attempting uninstall: spaCy\r\n",
+      "    Found existing installation: spacy 2.3.7\r\n",
+      "    Uninstalling spacy-2.3.7:\r\n",
+      "      Successfully uninstalled spacy-2.3.7\r\n",
+      "\u001b[31mERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.\r\n",
+      "tensorflow-io 0.21.0 requires tensorflow-io-gcs-filesystem==0.21.0, which is not installed.\r\n",
+      "explainable-ai-sdk 1.3.2 requires xai-image-widget, which is not installed.\r\n",
+      "texthero 1.1.0 requires spacy<3.0.0, but you have spacy 3.2.4 which is incompatible.\r\n",
+      "tensorflow 2.6.2 requires numpy~=1.19.2, but you have numpy 1.20.3 which is incompatible.\r\n",
+      "tensorflow 2.6.2 requires six~=1.15.0, but you have six 1.16.0 which is incompatible.\r\n",
+      "tensorflow 2.6.2 requires typing-extensions~=3.7.4, but you have typing-extensions 3.10.0.2 which is incompatible.\r\n",
+      "tensorflow 2.6.2 requires wrapt~=1.12.1, but you have wrapt 1.13.3 which is incompatible.\r\n",
+      "tensorflow-transform 1.5.0 requires absl-py<0.13,>=0.9, but you have absl-py 0.15.0 which is incompatible.\r\n",
+      "tensorflow-transform 1.5.0 requires numpy<1.20,>=1.16, but you have numpy 1.20.3 which is incompatible.\r\n",
+      "tensorflow-transform 1.5.0 requires pyarrow<6,>=1, but you have pyarrow 6.0.1 which is incompatible.\r\n",
+      "tensorflow-transform 1.5.0 requires tensorflow!=2.0.*,!=2.1.*,!=2.2.*,!=2.3.*,!=2.4.*,!=2.5.*,!=2.6.*,<2.8,>=1.15.2, but you have tensorflow 2.6.2 which is incompatible.\r\n",
+      "tensorflow-serving-api 2.7.0 requires tensorflow<3,>=2.7.0, but you have tensorflow 2.6.2 which is incompatible.\r\n",
+      "flake8 4.0.1 requires importlib-metadata<4.3; python_version < \"3.8\", but you have importlib-metadata 4.11.3 which is incompatible.\r\n",
+      "apache-beam 2.34.0 requires dill<0.3.2,>=0.3.1.1, but you have dill 0.3.4 which is incompatible.\r\n",
+      "apache-beam 2.34.0 requires httplib2<0.20.0,>=0.8, but you have httplib2 0.20.2 which is incompatible.\r\n",
+      "apache-beam 2.34.0 requires pyarrow<6.0.0,>=0.15.1, but you have pyarrow 6.0.1 which is incompatible.\r\n",
+      "aioitertools 0.10.0 requires typing_extensions>=4.0; python_version < \"3.10\", but you have typing-extensions 3.10.0.2 which is incompatible.\r\n",
+      "aiobotocore 2.1.2 requires botocore<1.23.25,>=1.23.24, but you have botocore 1.24.20 which is incompatible.\u001b[0m\r\n",
+      "Successfully installed catalogue-2.0.7 spaCy-3.2.4 srsly-2.4.3 thinc-8.0.15 typing-extensions-3.10.0.2\r\n",
+      "\u001b[33mWARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv\u001b[0m\r\n",
+      "Note: you may need to restart the kernel to use updated packages.\n"
+     ]
+    }
+   ],
+   "source": [
+    "pip install spaCy -U"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "id": "158bf859",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2022-04-24T20:52:28.319331Z",
+     "iopub.status.busy": "2022-04-24T20:52:28.318515Z",
+     "iopub.status.idle": "2022-04-24T20:52:28.387673Z",
+     "shell.execute_reply": "2022-04-24T20:52:28.387127Z",
+     "shell.execute_reply.started": "2022-04-24T19:58:06.347524Z"
+    },
+    "papermill": {
+     "duration": 0.157268,
+     "end_time": "2022-04-24T20:52:28.387814",
+     "exception": false,
+     "start_time": "2022-04-24T20:52:28.230546",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "test_data = pd.read_csv('/kaggle/input/kontur-home-assignment/test.tsv', sep = '\\t')\n",
+    "train_data = pd.read_csv('/kaggle/input/kontur-home-assignment/train.tsv', sep = '\\t')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "id": "cecd5424",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2022-04-24T20:52:28.560322Z",
+     "iopub.status.busy": "2022-04-24T20:52:28.559732Z",
+     "iopub.status.idle": "2022-04-24T20:52:40.783523Z",
+     "shell.execute_reply": "2022-04-24T20:52:40.782857Z",
+     "shell.execute_reply.started": "2022-04-24T19:58:06.414462Z"
+    },
+    "papermill": {
+     "duration": 12.312088,
+     "end_time": "2022-04-24T20:52:40.783659",
+     "exception": false,
+     "start_time": "2022-04-24T20:52:28.471571",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "import nltk\n",
+    "from nltk.tokenize import sent_tokenize, word_tokenize\n",
+    "from nltk.corpus import stopwords\n",
+    "import pymorphy2\n",
+    "import texthero as hero\n",
+    "from sklearn.neighbors import KNeighborsClassifier"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "id": "d9e2ec2f",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2022-04-24T20:52:40.951733Z",
+     "iopub.status.busy": "2022-04-24T20:52:40.951133Z",
+     "iopub.status.idle": "2022-04-24T20:52:41.382910Z",
+     "shell.execute_reply": "2022-04-24T20:52:41.382352Z",
+     "shell.execute_reply.started": "2022-04-24T19:58:18.672848Z"
+    },
+    "papermill": {
+     "duration": 0.518284,
+     "end_time": "2022-04-24T20:52:41.383044",
+     "exception": false,
+     "start_time": "2022-04-24T20:52:40.864760",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "morph = pymorphy2.MorphAnalyzer()\n",
+    "ru_stopwords = stopwords.words('russian')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "id": "d2be328e",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2022-04-24T20:52:41.559354Z",
+     "iopub.status.busy": "2022-04-24T20:52:41.558733Z",
+     "iopub.status.idle": "2022-04-24T20:52:41.578611Z",
+     "shell.execute_reply": "2022-04-24T20:52:41.579402Z",
+     "shell.execute_reply.started": "2022-04-24T19:58:18.938520Z"
+    },
+    "papermill": {
+     "duration": 0.113171,
+     "end_time": "2022-04-24T20:52:41.579657",
+     "exception": false,
+     "start_time": "2022-04-24T20:52:41.466486",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "/opt/conda/lib/python3.7/site-packages/ipykernel_launcher.py:2: FutureWarning: The default value of regex will change from True to False in a future version.\n",
+      "  \n",
+      "/opt/conda/lib/python3.7/site-packages/ipykernel_launcher.py:3: FutureWarning: The default value of regex will change from True to False in a future version.\n",
+      "  This is separate from the ipykernel package so we can avoid doing imports until\n"
+     ]
+    }
+   ],
+   "source": [
+    "prediction = test_data['title']\n",
+    "train_data['title_wo_punctuation'] = train_data['title'].str.replace(\"[^А-ЯЁа-яё0-9 ]\", \"\")\n",
+    "test_data['title_wo_punctuation'] = test_data['title'].str.replace(\"[^А-ЯЁа-яё0-9 ]\", \"\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "id": "136d39d0",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2022-04-24T20:52:41.753179Z",
+     "iopub.status.busy": "2022-04-24T20:52:41.752223Z",
+     "iopub.status.idle": "2022-04-24T21:18:51.447069Z",
+     "shell.execute_reply": "2022-04-24T21:18:51.446495Z",
+     "shell.execute_reply.started": "2022-04-24T19:58:18.976288Z"
+    },
+    "papermill": {
+     "duration": 1569.783253,
+     "end_time": "2022-04-24T21:18:51.447227",
+     "exception": false,
+     "start_time": "2022-04-24T20:52:41.663974",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "def converter(sentence):\n",
+    "    list = []\n",
+    "    words = sentence.split()\n",
+    "    analyzer = pymorphy2.MorphAnalyzer()\n",
+    "    list = map(lambda x: analyzer.parse(x)[0].normal_form, words)\n",
+    "    return ' '.join(list)\n",
+    "train_data['lemmatized_title'] = train_data['title_wo_punctuation'].apply(converter)\n",
+    "test_data['lemmatized_title'] = test_data['title_wo_punctuation'].apply(converter)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "id": "1efb4d1d",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2022-04-24T21:18:51.640523Z",
+     "iopub.status.busy": "2022-04-24T21:18:51.635410Z",
+     "iopub.status.idle": "2022-04-24T21:18:51.719464Z",
+     "shell.execute_reply": "2022-04-24T21:18:51.718940Z",
+     "shell.execute_reply.started": "2022-04-24T20:29:36.903158Z"
+    },
+    "papermill": {
+     "duration": 0.187198,
+     "end_time": "2022-04-24T21:18:51.719596",
+     "exception": false,
+     "start_time": "2022-04-24T21:18:51.532398",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "train_data['clean_title'] = train_data['lemmatized_title'].\\\n",
+    "                            apply(lambda x: ' '.join([word for word in x.split() if word not in (ru_stopwords)]))\n",
+    "test_data['clean_title'] = test_data['lemmatized_title'].\\\n",
+    "                            apply(lambda x: ' '.join([word for word in x.split() if word not in (ru_stopwords)]))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 12,
+   "id": "215b1f56",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2022-04-24T21:18:51.890019Z",
+     "iopub.status.busy": "2022-04-24T21:18:51.889391Z",
+     "iopub.status.idle": "2022-04-24T21:18:52.570686Z",
+     "shell.execute_reply": "2022-04-24T21:18:52.570073Z",
+     "shell.execute_reply.started": "2022-04-24T20:29:37.020388Z"
+    },
+    "papermill": {
+     "duration": 0.767822,
+     "end_time": "2022-04-24T21:18:52.570832",
+     "exception": false,
+     "start_time": "2022-04-24T21:18:51.803010",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "train_data['tokens'] = train_data['clean_title'].apply(word_tokenize)\n",
+    "test_data['tokens'] = test_data['clean_title'].apply(word_tokenize)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 13,
+   "id": "b20c160b",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2022-04-24T21:18:52.749936Z",
+     "iopub.status.busy": "2022-04-24T21:18:52.749311Z",
+     "iopub.status.idle": "2022-04-24T21:18:53.007680Z",
+     "shell.execute_reply": "2022-04-24T21:18:53.007176Z",
+     "shell.execute_reply.started": "2022-04-24T20:29:38.087997Z"
+    },
+    "papermill": {
+     "duration": 0.352505,
+     "end_time": "2022-04-24T21:18:53.007872",
+     "exception": false,
+     "start_time": "2022-04-24T21:18:52.655367",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "corpus = []\n",
+    "for item in train_data['tokens']:\n",
+    "    for token in item:\n",
+    "        corpus.append([token])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 14,
+   "id": "518399e3",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2022-04-24T21:18:53.175757Z",
+     "iopub.status.busy": "2022-04-24T21:18:53.175130Z",
+     "iopub.status.idle": "2022-04-24T21:18:53.177618Z",
+     "shell.execute_reply": "2022-04-24T21:18:53.178068Z",
+     "shell.execute_reply.started": "2022-04-24T20:29:38.380371Z"
+    },
+    "papermill": {
+     "duration": 0.088622,
+     "end_time": "2022-04-24T21:18:53.178232",
+     "exception": false,
+     "start_time": "2022-04-24T21:18:53.089610",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "from gensim.models.doc2vec import Doc2Vec, TaggedDocument\n",
+    "model = Doc2Vec(vector_size=5, min_count=2, epochs = 20)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 15,
+   "id": "e4aa679a",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2022-04-24T21:18:53.347211Z",
+     "iopub.status.busy": "2022-04-24T21:18:53.346555Z",
+     "iopub.status.idle": "2022-04-24T21:19:43.483579Z",
+     "shell.execute_reply": "2022-04-24T21:19:43.482707Z",
+     "shell.execute_reply.started": "2022-04-24T20:29:38.391019Z"
+    },
+    "papermill": {
+     "duration": 50.222673,
+     "end_time": "2022-04-24T21:19:43.483772",
+     "exception": false,
+     "start_time": "2022-04-24T21:18:53.261099",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "words = [TaggedDocument(word, 'tag') for word in corpus]\n",
+    "model.build_vocab(words)\n",
+    "model.train(words, total_examples=model.corpus_count, epochs=model.epochs)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 16,
+   "id": "2b0f4883",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2022-04-24T21:19:43.718547Z",
+     "iopub.status.busy": "2022-04-24T21:19:43.717538Z",
+     "iopub.status.idle": "2022-04-24T21:19:49.757616Z",
+     "shell.execute_reply": "2022-04-24T21:19:49.756968Z",
+     "shell.execute_reply.started": "2022-04-24T20:30:38.471416Z"
+    },
+    "papermill": {
+     "duration": 6.170694,
+     "end_time": "2022-04-24T21:19:49.757855",
+     "exception": false,
+     "start_time": "2022-04-24T21:19:43.587161",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "card2vec_train = [model.infer_vector((train_data['tokens'][i])) \n",
+    "            for i in range(0,len(train_data['tokens']))]\n",
+    "card2vec_test = [model.infer_vector((test_data['tokens'][i])) \n",
+    "            for i in range(0,len(test_data['tokens']))]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 17,
+   "id": "244e620c",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2022-04-24T21:19:49.927136Z",
+     "iopub.status.busy": "2022-04-24T21:19:49.926377Z",
+     "iopub.status.idle": "2022-04-24T21:19:49.938643Z",
+     "shell.execute_reply": "2022-04-24T21:19:49.939132Z",
+     "shell.execute_reply.started": "2022-04-24T20:30:47.002342Z"
+    },
+    "papermill": {
+     "duration": 0.09858,
+     "end_time": "2022-04-24T21:19:49.939298",
+     "exception": false,
+     "start_time": "2022-04-24T21:19:49.840718",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "vectors_train= np.array(card2vec_train).tolist()\n",
+    "train_data['card2vec'] = vectors_train\n",
+    "vectors_test= np.array(card2vec_test).tolist()\n",
+    "test_data['card2vec'] = vectors_test"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 18,
+   "id": "65b8c25e",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2022-04-24T21:19:50.107266Z",
+     "iopub.status.busy": "2022-04-24T21:19:50.106675Z",
+     "iopub.status.idle": "2022-04-24T21:19:50.239514Z",
+     "shell.execute_reply": "2022-04-24T21:19:50.239992Z",
+     "shell.execute_reply.started": "2022-04-24T20:30:47.021199Z"
+    },
+    "papermill": {
+     "duration": 0.21877,
+     "end_time": "2022-04-24T21:19:50.240155",
+     "exception": false,
+     "start_time": "2022-04-24T21:19:50.021385",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "train_data = pd.concat([train_data, pd.DataFrame(train_data['card2vec'].to_list(), \\\n",
+    "                                                 columns = ['1_2vec', '2_2vec','3_2vec', '4_2vec', '5_2vec'], \\\n",
+    "                                                 index = train_data.index)], axis=1)\n",
+    "test_data = pd.concat([test_data, pd.DataFrame(test_data['card2vec'].to_list(), \\\n",
+    "                                                 columns = ['1_2vec', '2_2vec','3_2vec', '4_2vec', '5_2vec'], \\\n",
+    "                                                 index = test_data.index)], axis=1)\n",
+    "train_data['words_number'] = [len(train_data['tokens'][i])\n",
+    "                  for i in train_data.index]\n",
+    "test_data['words_number'] = [len(test_data['tokens'][i])\n",
+    "                  for i in test_data.index]\n",
+    "train_data['words_average'] = [sum(map(len, train_data['clean_title'][i].split()))/len(train_data['clean_title'][i].split())\n",
+    "                  for i in train_data.index]\n",
+    "test_data['words_average'] = [sum(map(len, test_data['clean_title'][i].split()))/len(test_data['clean_title'][i].split())\n",
+    "                  for i in test_data.index]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 19,
+   "id": "1d8578a0",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2022-04-24T21:19:50.408864Z",
+     "iopub.status.busy": "2022-04-24T21:19:50.408207Z",
+     "iopub.status.idle": "2022-04-24T21:19:50.417978Z",
+     "shell.execute_reply": "2022-04-24T21:19:50.418441Z",
+     "shell.execute_reply.started": "2022-04-24T20:30:47.225051Z"
+    },
+    "papermill": {
+     "duration": 0.097598,
+     "end_time": "2022-04-24T21:19:50.418603",
+     "exception": false,
+     "start_time": "2022-04-24T21:19:50.321005",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "is_fake = train_data['is_fake']\n",
+    "train_data = train_data.drop(columns = ['is_fake'])\n",
+    "test_data = test_data.drop(columns = ['is_fake'])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 20,
+   "id": "477bd584",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2022-04-24T21:19:50.589967Z",
+     "iopub.status.busy": "2022-04-24T21:19:50.589302Z",
+     "iopub.status.idle": "2022-04-24T21:19:50.591022Z",
+     "shell.execute_reply": "2022-04-24T21:19:50.591411Z",
+     "shell.execute_reply.started": "2022-04-24T20:30:47.242899Z"
+    },
+    "papermill": {
+     "duration": 0.091939,
+     "end_time": "2022-04-24T21:19:50.591591",
+     "exception": false,
+     "start_time": "2022-04-24T21:19:50.499652",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "train_data = train_data.drop(columns = ['title', 'title_wo_punctuation', 'lemmatized_title', 'clean_title', 'tokens', 'card2vec'])\n",
+    "test_data = test_data.drop(columns = ['title', 'title_wo_punctuation', 'lemmatized_title', 'clean_title', 'tokens', 'card2vec'])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 21,
+   "id": "7aec7cdb",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2022-04-24T21:19:50.761557Z",
+     "iopub.status.busy": "2022-04-24T21:19:50.760987Z",
+     "iopub.status.idle": "2022-04-24T21:19:50.822997Z",
+     "shell.execute_reply": "2022-04-24T21:19:50.822465Z",
+     "shell.execute_reply.started": "2022-04-24T20:30:47.258425Z"
+    },
+    "papermill": {
+     "duration": 0.148969,
+     "end_time": "2022-04-24T21:19:50.823130",
+     "exception": false,
+     "start_time": "2022-04-24T21:19:50.674161",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "knn_model = KNeighborsClassifier(n_neighbors=41)\n",
+    "knn_model.fit(train_data,is_fake)\n",
+    "is_fake_predicted = knn_model.predict(test_data)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 22,
+   "id": "436d1bdb",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2022-04-24T21:19:50.993918Z",
+     "iopub.status.busy": "2022-04-24T21:19:50.993065Z",
+     "iopub.status.idle": "2022-04-24T21:19:50.994589Z",
+     "shell.execute_reply": "2022-04-24T21:19:50.995028Z",
+     "shell.execute_reply.started": "2022-04-24T20:30:47.331789Z"
+    },
+    "papermill": {
+     "duration": 0.089652,
+     "end_time": "2022-04-24T21:19:50.995192",
+     "exception": false,
+     "start_time": "2022-04-24T21:19:50.905540",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "prediction = prediction.to_frame()\n",
+    "prediction['is_fake'] = is_fake_predicted.tolist()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 23,
+   "id": "763fc7b1",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2022-04-24T21:19:51.163110Z",
+     "iopub.status.busy": "2022-04-24T21:19:51.162529Z",
+     "iopub.status.idle": "2022-04-24T21:19:51.173115Z",
+     "shell.execute_reply": "2022-04-24T21:19:51.172634Z",
+     "shell.execute_reply.started": "2022-04-24T20:30:47.339725Z"
+    },
+    "papermill": {
+     "duration": 0.095071,
+     "end_time": "2022-04-24T21:19:51.173249",
+     "exception": false,
+     "start_time": "2022-04-24T21:19:51.078178",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "prediction.to_csv('prediction.tsv',index=False, sep = '\\t')"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.7.12"
+  },
+  "papermill": {
+   "default_parameters": {},
+   "duration": 1726.346932,
+   "end_time": "2022-04-24T21:19:54.725847",
+   "environment_variables": {},
+   "exception": null,
+   "input_path": "__notebook__.ipynb",
+   "output_path": "__notebook__.ipynb",
+   "parameters": {},
+   "start_time": "2022-04-24T20:51:08.378915",
+   "version": "2.3.3"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
